@@ -1,0 +1,15 @@
+version: "3"
+services:
+  cudl-solr-indexing:
+    build:
+      context: ./lambda-docker
+      dockerfile: Dockerfile
+    container_name: cudl-solr-indexing
+    env_file:
+      - .env
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+    ports:
+      - 9000:8080
