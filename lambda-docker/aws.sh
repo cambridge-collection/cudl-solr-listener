@@ -11,9 +11,7 @@ function handler () {
    if $(jq empty /tmp/opt/cdcp/${JSON_FILE} &>/dev/null);
       then
         echo "Submitting file" 1>&2
-        # TODO: Remove echo from following line once server/api responsive.
-        echo curl --show-error --no-progress-meter -X POST -H 'Content-Type: application/json' "http://${SOLR_HOST}:8983/solr/cdcp/update/json/docs?split=/pages&f=/pages/*" --data-binary "@/tmp/opt/cdcp/${JSON_FILE}" 1>&2 \
-         && echo -e "Done" 1>&2
+        echo '{"http-code":' $(curl -s -o /dev/null -w "%{http_code}" -X PUT -H 'accept: application/json' "http://${API_HOST}:${API_PORT}/item" --data-binary "@/tmp/opt/cdcp/${JSON_FILE}") '}' 1>&2
       else
         echo "ERROR: File not submitted for reindexing because it doesn't seem valid" 1>&2;
       fi
