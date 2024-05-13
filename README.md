@@ -2,7 +2,6 @@
 
 ## Prerequisites
 
-
 The following containers needs to be running:
 
 * https://github.com/cambridge-collection/cudl-solr
@@ -16,4 +15,4 @@ The following containers needs to be running:
 
     curl -X POST -H 'Content-Type: application/json' 'http://localhost:9000/2015-03-31/functions/function/invocations' --data-binary "@./sample/sns-solr-json-modified.json"
 
-**NB:** This test requires that the json source document exists on `AWS_DIST_BUCKET`.
+**NB:** This test requires that the json source (`solr-json/MS-ADD-03987.json`) document exists on `AWS_DIST_BUCKET`.
