@@ -12,10 +12,13 @@ function handler() {
 		API_METHOD="PUT"
 	elif [[ "$EVENTNAME" =~ ^ObjectRemoved ]]; then
 		API_METHOD="DELETE"
+	else
+		API_METHOD="UNSUPPORTED"
 	fi
 
-	if [[ -v "API_HOST" && -v "API_PORT" && -v "API_PATH" && -n "$S3_BUCKET" && -n "$JSON_FILE" && -v "API_METHOD" ]]; then
-		if [ "$API_METHOD" = "PUT" ]; then
+	if [[ -v "API_HOST" && -v "API_PORT" && -v "API_PATH" && -n "$S3_BUCKET" && -n "$JSON_FILE" && -n "$EVENTNAME" ]]; then
+		if [[ "$EVENTNAME" =~ ^ObjectCreated ]]; then
+			API_METHOD="PUT"
 			echo "Indexing ${JSON_FILE}" 1>&2
 			echo "Attempting to download s3://${S3_BUCKET}/${JSON_FILE}" 1>&2
 			aws s3 cp --quiet s3://${S3_BUCKET}/${JSON_FILE} /tmp/opt/cdcp/${JSON_FILE} 1>&2 &&
@@ -30,12 +33,17 @@ function handler() {
 			else
 				echo "ERROR: File not submitted for reindexing because it doesn't seem valid" 1>&2
 			fi
-		elif [ $API_METHOD = "DELETE" ]; then
+		elif [[ "$EVENTNAME" =~ ^ObjectRemoved ]]; then
+			API_METHOD="DELETE"
 			ID_VAL=$(basename $(basename $JSON_FILE ".json") ".collection")
 			if [[ -n $ID_VAL ]]; then
 				echo "Deleting ${JSON_FILE} using ID \"${ID_VAL}\"" 1>&2
+				echo "Submitting request via ${API_METHOD}" 1>&2
 				echo '{"http-code":' $(curl -s -o /dev/null -w "%{http_code}" -X $API_METHOD "http://${API_HOST}:${API_PORT}/${API_PATH}/${ID_VAL}") '}' 1>&2
 			fi
+		else
+			echo "ERROR: Unsupported event: ${EVENTNAME}" 1>&2
+			return 1
 		fi
 	else
 		if [[ ! -v "API_HOST" ]]; then echo "ERROR: API_HOST environment var not set" 1>&2; fi
