@@ -1,6 +1,7 @@
 version: "3"
 services:
   cudl-solr-indexing:
+    platform: linux/amd64
     build:
       context: ./lambda-docker
       dockerfile: Dockerfile
