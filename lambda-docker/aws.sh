@@ -1,6 +1,11 @@
 #! /bin/sh
 
 function handler() {
+	set -a
+	# Set defaults for env vars that are unlikely to change.
+	: "${API_PORT:=}"
+	set +a
+
 	echo "Parsing event notification" 1>&2
 	echo "$1" 1>&2
 
@@ -16,7 +21,7 @@ function handler() {
 		API_METHOD="UNSUPPORTED"
 	fi
 
-	if [[ -v "API_HOST" && -v "API_PORT" && -v "API_PATH" && -n "$S3_BUCKET" && -n "$JSON_FILE" && -n "$EVENTNAME" ]]; then
+	if [[ -v "API_HOST" && -v "API_PATH" && -n "$S3_BUCKET" && -n "$JSON_FILE" && -n "$EVENTNAME" ]]; then
 		if [[ "$EVENTNAME" =~ ^ObjectCreated ]]; then
 			API_METHOD="PUT"
 			echo "Indexing ${JSON_FILE}" 1>&2
