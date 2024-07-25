@@ -33,8 +33,13 @@ function handler() {
 			# Test that json is plausibly valid before submitting
 			if $(jq empty /tmp/opt/cdcp/${JSON_FILE} &>/dev/null); then
 				echo "File OK" 1>&2
-				echo "Submitting file via ${API_METHOD}" 1>&2
-				response_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 -X $API_METHOD -H 'accept: application/json' "http://${API_HOST}:${API_PORT}/${API_PATH}" --data-binary "@/tmp/opt/cdcp/${JSON_FILE}")
+				if [ -z "${API_PORT}" ]; then
+					HOSTNAME=${API_HOST}
+				else
+					HOSTNAME=${API_HOST}:${API_PORT}
+				fi
+				echo "Submitting file via ${API_METHOD} to http://${HOSTNAME}/${API_PATH}" 1>&2
+				response_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 -X $API_METHOD -H 'accept: application/json' "http://${HOSTNAME}/${API_PATH}" --data-binary "@/tmp/opt/cdcp/${JSON_FILE}")
 				msg='{"http-code": '$response_code' }'
 				if ! [[ $response_code =~ ^2[0-9][0-9] ]]; then
 					echo "ERROR: ${msg}" 1>&2
