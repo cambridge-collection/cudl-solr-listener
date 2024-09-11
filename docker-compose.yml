@@ -1,4 +1,3 @@
-version: "3"
 services:
   cudl-solr-indexing:
     platform: linux/amd64
