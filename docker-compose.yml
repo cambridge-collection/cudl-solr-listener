@@ -2,9 +2,9 @@ services:
   cudl-solr-indexing:
     platform: linux/amd64
     build:
-      context: ./lambda-docker
+      context: aws-lambda-listener
       dockerfile: Dockerfile
-    container_name: cudl-solr-indexing
+    container_name: cudl-indexer-py
     env_file:
       - .env
     environment:
