@@ -83,7 +83,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             event_name: str = inner.get("eventName", "")
             s3_info: Dict[str, Any] = inner.get("s3", {})
             s3_bucket: str = s3_info.get("bucket", {}).get("name", "")
-            json_file: str = s3_info.get("object", {}).get("key", "")
+            json_file: str = urllib.parse.unquote_plus(s3_info.get("object", {}).get("key", ""))
 
             logger.info("Processing event: %s", event_name)
             logger.info("Bucket: %s, Key: %s", s3_bucket, json_file)
