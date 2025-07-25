@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import urllib.parse
 import logging
 import boto3
 import requests
