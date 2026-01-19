@@ -1,18 +1,32 @@
-# Instructions
+# Cudl Solr Listener
+
+The Cudl Solr Listener is a component in the Cambridge Digital Collection Platform. It runs as an AWS Lambda function that processes SNS notifications triggered by the creation or deletion of JSON files used by Solr.
+
+It listens for two event types:
+- **ObjectCreated:** Downloads the JSON file from S3, validates it, and submits it via a PUT request.
+- **ObjectRemoved:** Deletes the corresponding record via a DELETE request based on the filename.
 
 ## Prerequisites
 
-The following containers needs to be running:
+Before running the project locally, ensure that the following containers are running:
 
-* https://github.com/cambridge-collection/cudl-solr
-* https://github.com/cambridge-collection/cudl-search
+- [cudl-solr](https://github.com/cambridge-collection/cudl-solr)
+- [cudl-search](https://github.com/cambridge-collection/cudl-search)
 
-## Local Build
+## Environment Variables
 
-    docker compose up --force-recreate --build
+The Lambda function requires the following environment variables to be set:
 
-## Submitting a test notification for a modified json solr file
+- `API_HOST`: The API host for submitting requests.
+- `API_PORT`: The port number of the API (optional).
+- `API_PATH`: The API path for the submission endpoint.
 
-    curl -X POST -H 'Content-Type: application/json' 'http://localhost:9000/2015-03-31/functions/function/invocations' --data-binary "@./sample/sns-solr-json-modified.json"
+## Local Build and Run
 
-**NB:** This test requires that the json source (`solr-json/MS-ADD-03987.json`) document exists on `AWS_DIST_BUCKET`.
+Before building, log in to the relevant AWS account and ensure that your credentials are correctly set in your environment.
+
+To build and run the project locally using Docker Compose, run:
+
+```bash
+docker compose up --force-recreate --build
+```
