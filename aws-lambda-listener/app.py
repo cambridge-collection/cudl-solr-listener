@@ -9,7 +9,11 @@ from typing import Any, Dict, Optional
 
 # Configure logging to standard error.
 logger = logging.getLogger()
-logger.setLevel(logging.ERROR)  # INFO
+logger.setLevel(
+    logging.getLevelNamesMapping().get(
+        os.environ.get("LOG_LEVEL", "ERROR").upper(), logging.ERROR
+    )
+)
 
 # Compile a regex pattern to match any wildcard characters.
 WILDCARD_PATTERN = re.compile(r"[\*\?\{\}\[\]\|]")
