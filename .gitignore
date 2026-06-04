@@ -7,3 +7,9 @@
 /data/
 /venv/
 /test.log
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
