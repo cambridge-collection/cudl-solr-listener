@@ -21,6 +21,7 @@ The Lambda function requires the following environment variables to be set:
 - `API_PORT`: The port number of the API (optional).
 - `API_PATH`: The API path for the submission endpoint.
 - `RELEASES_PARTITIONED`: When set to `true`, DELETE requests include an `isReleased` query parameter derived from the object's root directory (`unreleased/...` → `false`, otherwise `true`). Optional; defaults to off.
+- `LOG_LEVEL`: Logging verbosity (e.g. `DEBUG`, `INFO`, `WARNING`, `ERROR`). Optional; defaults to `ERROR`.
 
 ## Local Build and Run
 
