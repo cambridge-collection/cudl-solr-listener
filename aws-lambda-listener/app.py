@@ -67,7 +67,7 @@ def submit_request(
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     logger.info("Parsing event notification")
-    logger.info(json.dumps(event))
+    logger.debug(json.dumps(event))
 
     API_HOST: Optional[str] = os.environ.get("API_HOST")
     API_PORT: Optional[str] = os.environ.get("API_PORT", "")
