@@ -62,6 +62,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     API_HOST: Optional[str] = os.environ.get("API_HOST")
     API_PORT: Optional[str] = os.environ.get("API_PORT", "")
     API_PATH: Optional[str] = os.environ.get("API_PATH")
+    RELEASES_PARTITIONED: bool = (
+        os.environ.get("RELEASES_PARTITIONED", "").lower() == "true"
+    )
 
     if not API_HOST:
         logger.error("ERROR: API_HOST environment variable not set")
@@ -163,6 +166,20 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.info("Deleting %s using ID \"%s\"", json_file, id_val)
 
                 url = f"http://{API_HOST}:{API_PORT}/{API_PATH}/{id_val}"
+
+                if RELEASES_PARTITIONED:
+                    # Released and unreleased items are written to different locations
+                    root_dir = json_file.split("/")[0]
+                    item_released = root_dir != "unreleased"
+                    query = urllib.parse.urlencode(
+                        {"isReleased": str(item_released).lower()}
+                    )
+                    url = f"{url}?{query}"
+                    logger.info(
+                        "Releases partitioned; isReleased=%s",
+                        str(item_released).lower(),
+                    )
+
                 status_code = submit_request(method, url)
                 msg = {"http-code": status_code}
                 if not (status_code and 200 <= status_code < 300):
