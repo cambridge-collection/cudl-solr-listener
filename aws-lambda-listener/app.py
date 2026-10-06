@@ -18,9 +18,6 @@ logger.setLevel(
 # Compile a regex pattern to match any wildcard characters.
 WILDCARD_PATTERN = re.compile(r"[\*\?\{\}\[\]\|]")
 
-# 4xx responses that can succeed on redelivery; any other 4xx is permanent.
-RETRYABLE_CLIENT_ERRORS = {408, 429}
-
 s3_client = boto3.client("s3")
 
 
@@ -52,12 +49,16 @@ def submit_request(
     """
     logger.info("Submitting %s via %s to %s", json_file, method, url)
     headers = {"accept": "application/json"}
+    # A 3xx is reported as a failure rather than followed; requests would
+    # resend a redirected PUT as a GET.
     try:
         if method == "PUT" and file_path:
             with open(file_path, "rb") as f:
-                response = requests.put(url, headers=headers, data=f, timeout=120)
+                response = requests.put(
+                    url, headers=headers, data=f, timeout=120, allow_redirects=False
+                )
         elif method == "DELETE":
-            response = requests.delete(url, timeout=120)
+            response = requests.delete(url, timeout=120, allow_redirects=False)
         else:
             logger.error("Unsupported method or missing file for PUT")
             return None
@@ -70,23 +71,14 @@ def submit_request(
         return None
 
 
-def is_retryable(status_code: Optional[int]) -> bool:
-    if status_code is None:
-        return True
-    if 200 <= status_code < 300:
-        return False
-    return not 400 <= status_code < 500 or status_code in RETRYABLE_CLIENT_ERRORS
-
-
 def record_outcome(json_file: str, status_code: Optional[int], failures: List[str]):
     msg = {"file": json_file, "http-code": status_code}
     if status_code is not None and 200 <= status_code < 300:
         logger.info(msg)
-    elif is_retryable(status_code):
-        logger.error("ERROR: %s; failing so the message is redelivered", msg)
-        failures.append(json_file)
-    else:
-        logger.error("ERROR: %s; not retrying", msg)
+        return
+    logger.error("ERROR: %s; failing so the message is redelivered", msg)
+    reason = f"HTTP {status_code}" if status_code is not None else "no response"
+    failures.append(f"{json_file} ({reason})")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -179,7 +171,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     download_s3_file(s3_bucket, json_file, dest_path)
                 except Exception as e:
                     logger.error("Error downloading %s: %s", json_file, e)
-                    failures.append(json_file)
+                    failures.append(f"{json_file} (download failed)")
                     continue
 
                 logger.info("Testing file is plausibly valid JSON")
