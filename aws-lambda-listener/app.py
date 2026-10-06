@@ -5,7 +5,7 @@ import urllib.parse
 import logging
 import boto3
 import requests
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # Configure logging to standard error.
 logger = logging.getLogger()
@@ -40,29 +40,45 @@ def validate_json_file(filepath: str) -> bool:
 
 
 def submit_request(
-    method: str, url: str, file_path: Optional[str] = None
+    method: str, url: str, json_file: str, file_path: Optional[str] = None
 ) -> Optional[int]:
     """Submit a request to the API endpoint.
 
     For PUT, file_path is used to send binary data.
     For DELETE, no file is sent.
     """
-    logger.info("Submitting file via %s to %s", method, url)
+    logger.info("Submitting %s via %s to %s", json_file, method, url)
     headers = {"accept": "application/json"}
+    # A 3xx is reported as a failure rather than followed; requests would
+    # resend a redirected PUT as a GET.
     try:
         if method == "PUT" and file_path:
             with open(file_path, "rb") as f:
-                response = requests.put(url, headers=headers, data=f, timeout=120)
+                response = requests.put(
+                    url, headers=headers, data=f, timeout=120, allow_redirects=False
+                )
         elif method == "DELETE":
-            response = requests.delete(url, timeout=120)
+            response = requests.delete(url, timeout=120, allow_redirects=False)
         else:
             logger.error("Unsupported method or missing file for PUT")
             return None
         logger.info("Response code: %s", response.status_code)
+        if not 200 <= response.status_code < 300:
+            logger.error("Response body for %s: %s", json_file, response.text)
         return response.status_code
     except Exception as e:
-        logger.error("Error submitting request: %s", e)
+        logger.error("Error submitting %s: %s", json_file, e)
         return None
+
+
+def record_outcome(json_file: str, status_code: Optional[int], failures: List[str]):
+    msg = {"file": json_file, "http-code": status_code}
+    if status_code is not None and 200 <= status_code < 300:
+        logger.info(msg)
+        return
+    logger.error("ERROR: %s; failing so the message is redelivered", msg)
+    reason = f"HTTP {status_code}" if status_code is not None else "no response"
+    failures.append(f"{json_file} ({reason})")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -84,6 +100,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
     if not API_PATH:
         logger.error("ERROR: API_PATH environment variable not set")
+
+    failures: List[str] = []
 
     # Process each SNS record.
     for record in event.get("Records", []):
@@ -109,11 +127,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if WILDCARD_PATTERN.search(json_file) or WILDCARD_PATTERN.search(s3_bucket):
                 if WILDCARD_PATTERN.search(json_file):
                     logger.error(
-                        "ERROR: File not processed because wildcard character in filename"
+                        "ERROR: %s not processed because wildcard character in filename",
+                        json_file,
                     )
                 if WILDCARD_PATTERN.search(s3_bucket):
                     logger.error(
-                        "ERROR: File not processed because wildcard character in bucket name"
+                        "ERROR: %s not processed because wildcard character in bucket name",
+                        json_file,
                     )
                 continue
 
@@ -150,30 +170,28 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 try:
                     download_s3_file(s3_bucket, json_file, dest_path)
                 except Exception as e:
-                    logger.error("Error downloading file: %s", e)
+                    logger.error("Error downloading %s: %s", json_file, e)
+                    failures.append(f"{json_file} (download failed)")
                     continue
 
                 logger.info("Testing file is plausibly valid JSON")
                 if not validate_json_file(dest_path):
                     logger.error(
-                        "ERROR: File not submitted for reindexing because it doesn't seem valid"
+                        "ERROR: %s not submitted for reindexing because it doesn't seem valid",
+                        json_file,
                     )
                     continue
                 logger.info("File OK")
 
                 hostname = f"{API_HOST}:{API_PORT}" if API_PORT else API_HOST
                 url = f"http://{hostname}/{API_PATH}"
-                status_code = submit_request(method, url, file_path=dest_path)
+                status_code = submit_request(method, url, json_file, file_path=dest_path)
                 try:
                     os.remove(dest_path)
                     logger.info("Deleted temporary file: %s", dest_path)
                 except Exception as e:
                     logger.error("Failed to delete temporary file %s: %s", dest_path, e)
-                msg = {"http-code": status_code}
-                if not (status_code and 200 <= status_code < 300):
-                    logger.error("ERROR: %s", msg)
-                else:
-                    logger.info(msg)
+                record_outcome(json_file, status_code, failures)
 
             elif method == "DELETE":
                 # Derive an ID by stripping .json or .collection.json suffixes.
@@ -202,11 +220,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         str(item_released).lower(),
                     )
 
-                status_code = submit_request(method, url)
-                msg = {"http-code": status_code}
-                if not (status_code and 200 <= status_code < 300):
-                    logger.error("ERROR: %s", msg)
-                else:
-                    logger.info(msg)
+                status_code = submit_request(method, url, json_file)
+                record_outcome(json_file, status_code, failures)
 
+    if failures:
+        raise RuntimeError("Failed to process: %s" % ", ".join(failures))
     return {"status": "done"}
